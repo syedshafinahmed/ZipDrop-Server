@@ -29,6 +29,7 @@ async function run() {
 
     const db = client.db("zip_drop_db");
     const parcelsCollection = db.collection("parcels");
+    const paymentCollection = db.collection("payments");
 
     // parcel API
     app.get("/parcels", async (req, res) => {
@@ -118,6 +119,7 @@ async function run() {
         mode: "payment",
         metadata: {
           parcelId: paymentinfo.parcelId,
+          parcelName: paymentInfo.parcelName,
         },
         success_url: `${process.env.SITE_DOMAIN}/dashboard/payment-success`,
         cancel_url: `${process.env.SITE_DOMAIN}/dashboard/payment-cancelled`,
@@ -139,6 +141,27 @@ async function run() {
           },
         };
         const result = await parcelsCollection.updateOne(query, update);
+
+        const payment = {
+          amount: session.amount_total / 100,
+          currency: session.currency,
+          customerEmail: session.customer_email,
+          parcelId: session.metadata.parcelId,
+          parcelName: session.metadata.parcelName,
+          transactionId: session.payment_intent,
+          paymentStatus: session.payment_status,
+          paidAt: new Date(),
+          trackingId: ''
+        };
+        if (session.payment_status === "paid") {
+          const resultPayment = await paymentCollection.insertOne(payment);
+          res.send({
+            succcess: true,
+            modifyParcel: result,
+            paymentInfo: resultPayment,
+          });
+        }
+
         res.send(result);
       }
       res.send({
