@@ -7,6 +7,14 @@ const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 require("dotenv").config();
 const stripe = require("stripe")(process.env.STRIPE_SECRET);
 
+const crypto = require("crypto");
+function generateTrackingId() {
+  const prefix = "PRCL";
+  const date = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+  const random = crypto.randomBytes(3).toString("hex").toUpperCase();
+  return `${prefix}-${date}-${random}`;
+}
+
 // middleware
 app.use(express.json());
 app.use(cors());
@@ -131,13 +139,15 @@ async function run() {
     app.patch("/payment-success", async (req, res) => {
       const sessionId = req.query.session_id;
       const session = await stripe.checkout.sessions.retrieve(sessionId);
-      console.log("session retrueved", session);
+      console.log("session retrieved", session);
+      const trackingId = generateTrackingId();
       if (session.payment_status === "paid") {
         const id = session.metadata.parcelId;
         const query = { _id: new ObjectId(id) };
         const update = {
           $set: {
             paymentStatus: "paid",
+            trackingId: trackingId,
           },
         };
         const result = await parcelsCollection.updateOne(query, update);
@@ -151,12 +161,13 @@ async function run() {
           transactionId: session.payment_intent,
           paymentStatus: session.payment_status,
           paidAt: new Date(),
-          trackingId: ''
         };
         if (session.payment_status === "paid") {
           const resultPayment = await paymentCollection.insertOne(payment);
           res.send({
             succcess: true,
+            trackingId: trackingId,
+            transactionId: session.payment_intent,
             modifyParcel: result,
             paymentInfo: resultPayment,
           });
