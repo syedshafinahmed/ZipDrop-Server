@@ -59,8 +59,19 @@ async function run() {
     await client.connect();
 
     const db = client.db("zip_drop_db");
+    const userCollection = db.collection("users");
     const parcelsCollection = db.collection("parcels");
     const paymentCollection = db.collection("payments");
+
+    // users related API
+    app.post("/users", async (req, res) => {
+      const user = req.body;
+      user.role = "user";
+      user.createdAt = new Date();
+
+      const result = await userCollection.insertOne(user);
+      res.send(result);
+    });
 
     // parcel API
     app.get("/parcels", async (req, res) => {
@@ -230,7 +241,10 @@ async function run() {
         }
       }
       const cursor = paymentCollection.find(query);
-      const result = await cursor.toArray();
+      const result = await paymentCollection
+        .find(query)
+        .sort({ paidAt: -1 })
+        .toArray();
       res.send(result);
     });
 
