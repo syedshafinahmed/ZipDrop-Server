@@ -266,6 +266,19 @@ async function run() {
       res.send(result);
     });
 
+    app.patch("/riders/:id", verifyFirebaseToken, async (req, res) => {
+      const status = req.body.status;
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const updatedDoc = {
+        $set: {
+          status: status,
+        },
+      };
+      const result = await riderCollection.updateOne(query, updatedDoc);
+      res.send(result);
+    });
+
     app.post("/riders", async (req, res) => {
       const rider = req.body;
       rider.status = "pending";
