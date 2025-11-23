@@ -60,6 +60,7 @@ async function run() {
 
     const db = client.db("zip_drop_db");
     const userCollection = db.collection("users");
+    const riderCollection = db.collection("riders");
     const parcelsCollection = db.collection("parcels");
     const paymentCollection = db.collection("payments");
 
@@ -251,6 +252,25 @@ async function run() {
         .find(query)
         .sort({ paidAt: -1 })
         .toArray();
+      res.send(result);
+    });
+
+    // riders related API
+    app.get("/riders", async (req, res) => {
+      const query = {};
+      if (req.query.status) {
+        query.status = req.query.status;
+      }
+      const cursor = riderCollection.find(query);
+      const result = await cursor.toArray();
+      res.send(result);
+    });
+
+    app.post("/riders", async (req, res) => {
+      const rider = req.body;
+      rider.status = "pending";
+      rider.createdAt = new Date();
+      const result = await riderCollection.insertOne(rider);
       res.send(result);
     });
 
