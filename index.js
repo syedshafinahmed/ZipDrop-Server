@@ -276,6 +276,19 @@ async function run() {
         },
       };
       const result = await riderCollection.updateOne(query, updatedDoc);
+      if (status === "approved") {
+        const email = req.body.email;
+        const userQuery = { email };
+        const updateUser = {
+          $set: {
+            role: "rider",
+          },
+        };
+        const userResult = await userCollection.updateOne(
+          userQuery,
+          updateUser
+        );
+      }
       res.send(result);
     });
 
