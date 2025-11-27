@@ -65,11 +65,18 @@ async function run() {
     const paymentCollection = db.collection("payments");
 
     // users related API
+    app.get("/users", verifyFirebaseToken, async (req, res) => {
+      const cursor = userCollection.find();
+      const result = await cursor.toArray();
+      res.send(result);
+    });
+
     app.post("/users", async (req, res) => {
       const user = req.body;
       user.role = "user";
       user.createdAt = new Date();
       const email = user.email;
+      user.photoURL = req.body.photoURL || "";
 
       const userExist = await userCollection.findOne({ email });
       if (userExist) {
