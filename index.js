@@ -67,6 +67,11 @@ async function run() {
     // middleware with database Access
     const verifyAdmin = async (req, res, next) => {
       const email = req.decoded_email;
+      const query = { email };
+      const user = await userCollection.findOne(query);
+      if (!user || user.role !== "admin") {
+        return res.status(403).send({ message: "Forbidden Access" });
+      }
       next();
     };
 
@@ -90,6 +95,7 @@ async function run() {
       const user = req.body;
       user.role = "user";
       user.createdAt = new Date();
+      user.displayName = req.body.displayName;
       const email = user.email;
       user.photoURL = req.body.photoURL || "";
 
@@ -306,31 +312,36 @@ async function run() {
       res.send(result);
     });
 
-    app.patch("/riders/:id", verifyFirebaseToken, async (req, res) => {
-      const status = req.body.status;
-      const id = req.params.id;
-      const query = { _id: new ObjectId(id) };
-      const updatedDoc = {
-        $set: {
-          status: status,
-        },
-      };
-      const result = await riderCollection.updateOne(query, updatedDoc);
-      if (status === "approved") {
-        const email = req.body.email;
-        const userQuery = { email };
-        const updateUser = {
+    app.patch(
+      "/riders/:id",
+      verifyFirebaseToken,
+      verifyAdmin,
+      async (req, res) => {
+        const status = req.body.status;
+        const id = req.params.id;
+        const query = { _id: new ObjectId(id) };
+        const updatedDoc = {
           $set: {
-            role: "rider",
+            status: status,
           },
         };
-        const userResult = await userCollection.updateOne(
-          userQuery,
-          updateUser
-        );
+        const result = await riderCollection.updateOne(query, updatedDoc);
+        if (status === "approved") {
+          const email = req.body.email;
+          const userQuery = { email };
+          const updateUser = {
+            $set: {
+              role: "rider",
+            },
+          };
+          const userResult = await userCollection.updateOne(
+            userQuery,
+            updateUser
+          );
+        }
+        res.send(result);
       }
-      res.send(result);
-    });
+    );
 
     app.post("/riders", async (req, res) => {
       const rider = req.body;
