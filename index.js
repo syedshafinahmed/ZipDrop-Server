@@ -71,6 +71,15 @@ async function run() {
       res.send(result);
     });
 
+    app.get("/users/:id", async (req, res) => {});
+
+    app.get("/users/:email/role", async (req, res) => {
+      const email = req.params.email;
+      const query = { email };
+      const user = await userCollection.findOne(query);
+      res.send({ role: user?.role || "user" });
+    });
+
     app.post("/users", async (req, res) => {
       const user = req.body;
       user.role = "user";
