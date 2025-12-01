@@ -61,8 +61,14 @@ async function run() {
     const db = client.db("zip_drop_db");
     const userCollection = db.collection("users");
     const riderCollection = db.collection("riders");
-    const parcelsCollection = db.collection("parcels");
     const paymentCollection = db.collection("payments");
+    const parcelsCollection = db.collection("parcels");
+
+    // middleware with database Access
+    const verifyAdmin = async (req, res, next) => {
+      const email = req.decoded_email;
+      next();
+    };
 
     // users related API
     app.get("/users", verifyFirebaseToken, async (req, res) => {
@@ -96,18 +102,23 @@ async function run() {
       res.send(result);
     });
 
-    app.patch("/users/:id", async (req, res) => {
-      const id = req.params.id;
-      const roleInfo = req.body;
-      const query = { _id: new ObjectId(id) };
-      const updatedDoc = {
-        $set: {
-          role: roleInfo.role,
-        },
-      };
-      const result = await userCollection.updateOne(query, updatedDoc);
-      res.send(result);
-    });
+    app.patch(
+      "/users/:id/role",
+      verifyFirebaseToken,
+      verifyAdmin,
+      async (req, res) => {
+        const id = req.params.id;
+        const roleInfo = req.body;
+        const query = { _id: new ObjectId(id) };
+        const updatedDoc = {
+          $set: {
+            role: roleInfo.role,
+          },
+        };
+        const result = await userCollection.updateOne(query, updatedDoc);
+        res.send(result);
+      }
+    );
 
     // parcel API
     app.get("/parcels", async (req, res) => {
