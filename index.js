@@ -141,7 +141,10 @@ async function run() {
     // parcel API
     app.get("/parcels", async (req, res) => {
       const query = {};
-      const { email } = req.query;
+      const { email, deliveryStatus } = req.query;
+      if (deliveryStatus) {
+        query.deliveryStatus = deliveryStatus;
+      }
       if (email) {
         query.senderEmail = email;
       }
@@ -239,56 +242,60 @@ async function run() {
     app.patch("/payment-success", async (req, res) => {
       const sessionId = req.query.session_id;
       const session = await stripe.checkout.sessions.retrieve(sessionId);
-      // console.log("session retrieved", session);
 
       const transactionId = session.payment_intent;
-      const query = { transactionId: transactionId };
-      const paymentExist = await paymentCollection.findOne(query);
-      if (paymentExist) {
+      const existingPayment = await paymentCollection.findOne({
+        transactionId,
+      });
+
+      if (existingPayment) {
         return res.send({
           message: "already exists",
-          trackingId: paymentExist.trackingId,
+          trackingId: existingPayment.trackingId,
           transactionId,
         });
       }
 
       const trackingId = generateTrackingId();
-      if (session.payment_status === "paid") {
-        const id = session.metadata.parcelId;
-        const query = { _id: new ObjectId(id) };
-        const update = {
-          $set: {
-            paymentStatus: "paid",
-            trackingId: trackingId,
-          },
-        };
-        const result = await parcelsCollection.updateOne(query, update);
 
-        const payment = {
+      if (session.payment_status === "paid") {
+        const parcelId = session.metadata.parcelId;
+
+        await parcelsCollection.updateOne(
+          { _id: new ObjectId(parcelId) },
+          {
+            $set: {
+              paymentStatus: "paid",
+              deliveryStatus: "pending-pickup",
+              trackingId,
+            },
+          }
+        );
+
+        const paymentData = {
           amount: session.amount_total / 100,
           currency: session.currency,
           customerEmail: session.customer_email,
-          parcelId: session.metadata.parcelId,
+          parcelId,
           parcelName: session.metadata.parcelName,
-          transactionId: session.payment_intent,
+          transactionId,
           paymentStatus: session.payment_status,
           paidAt: new Date(),
-          trackingId: trackingId,
+          trackingId,
         };
-        if (session.payment_status === "paid") {
-          const resultPayment = await paymentCollection.insertOne(payment);
-          res.send({
-            succcess: true,
-            trackingId: trackingId,
-            transactionId: session.payment_intent,
-            modifyParcel: result,
-            paymentInfo: resultPayment,
-          });
-        }
 
-        res.send(result);
+        const insertedPayment = await paymentCollection.insertOne(paymentData);
+
+        return res.send({
+          success: true,
+          trackingId,
+          transactionId,
+          paymentInfo: insertedPayment,
+        });
       }
-      res.send({
+
+      // Only runs if NOT paid
+      return res.send({
         success: false,
       });
     });
